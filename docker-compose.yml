@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  omniagent:
+    build: .
+    container_name: omniagent
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"   # FastAPI
+      - "8501:8501"   # Streamlit Dashboard
+    volumes:
+      - ./data:/app/data  # Persist SQLite DB
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  dashboard:
+    build: .
+    container_name: omniagent-dashboard
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8501:8501"
+    command: ["streamlit", "run", "api/dashboard.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    depends_on:
+      - omniagent

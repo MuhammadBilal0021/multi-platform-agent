@@ -30,7 +30,7 @@ shutdown_event = threading.Event()
 def run_discord():
     """Start the Discord adapter."""
     try:
-        from adapters.discord_adapter import bot
+        from adapters.discord_adapter import client
         import asyncio
 
         token = os.environ.get("DISCORD_BOT_TOKEN")
@@ -41,7 +41,7 @@ def run_discord():
         logger.info("Starting Discord adapter...")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(bot.start(token))
+        loop.run_until_complete(client.start(token))
     except Exception as e:
         logger.error("Discord adapter crashed: %s", e)
 
@@ -56,10 +56,17 @@ def run_slack():
             return
 
         logger.info("Starting Slack adapter...")
-        from adapters.slack_adapter import start_slack_bot
-        start_slack_bot()
+        from adapters.slack_adapter import app as slack_app
+        from slack_bolt.adapter.socket_mode import SocketModeHandler
+        handler = SocketModeHandler(slack_app, app_token)
+        handler.connect()
+        # Keep thread alive
+        import time
+        while True:
+            time.sleep(1)
     except Exception as e:
         logger.error("Slack adapter crashed: %s", e)
+
 
 
 def run_email():

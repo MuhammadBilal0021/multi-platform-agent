@@ -14,3 +14,10 @@ class AgentState(TypedDict):
     tool_results: List[Any]             # Results from any tools called during the reasoning cycle
     response:     Optional[str]         # The final string the agent wants to send back
     metadata:     Dict[str, Any]        # Any extra platform-specific data (e.g., thread_ts for Slack)
+    
+    # Safety & tracking fields
+    cost_usd:             float
+    step_count:           int
+    consecutive_tool_signatures: List[str]
+    no_progress_count:    int
+    termination_reason:   Optional[str]

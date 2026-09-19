@@ -1,5 +1,9 @@
 # 🤖 OmniAgent — Multi-Platform AI Agent
 
+**Design Boundary**: Env-configured allow-lists, single-tenant by design; a multi-tenant deployment would move policy to a datastore. `.env` is a configuration boundary, not a security boundary — anyone who can write the environment can change the policy.
+
+*Note: Tool execution filtering occurs securely at dispatch; bind-time tool filtering is for efficiency and clarity.*
+
 A production-ready, autonomous AI agent that operates across **Discord**, **Slack**, **Email**, and **Twitter** — powered by **LangGraph** and **OpenRouter**.
 
 ## 🏗️ Architecture

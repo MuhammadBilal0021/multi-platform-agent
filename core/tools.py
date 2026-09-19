@@ -122,7 +122,18 @@ def summarize_url(url: str) -> str:
         return f"Error fetching URL: {str(e)}"
 
 
+# -----------------------------------------------------------------------------
+# TOOL 4: DEMO DESTRUCTIVE ACTION
+# -----------------------------------------------------------------------------
+@tool
+def demo_destructive_action(target: str) -> str:
+    """
+    A simulated destructive action for demonstration purposes.
+    """
+    return f"[dry-run] Destructive action performed on {target}."
+
+
 # =============================================================================
 # TOOL REGISTRY — add new tools to this list to make them available
 # =============================================================================
-available_tools = [web_search, get_time, summarize_url]
+available_tools = [web_search, get_time, summarize_url, demo_destructive_action]

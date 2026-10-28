@@ -71,6 +71,13 @@ def load_data():
 st.title("🧠 OmniAgent Command Center")
 st.markdown("Live monitoring for your Multi-Platform AI Agent.")
 
+import os
+import secrets
+admin_token = os.environ.get("OMNI_ADMIN_TOKEN", "")
+provided = st.sidebar.text_input("Admin token", type="password")
+if len(admin_token) < 32 or not secrets.compare_digest(provided.encode(), admin_token.encode()):
+    st.info("Enter the configured admin token to view monitoring data.")
+    st.stop()
 df = load_data()
 
 if df.empty:

@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.brain import run_brain
 from core.state import AgentState
-from core.memory import clear_history
+from core.brain import reset_conversation
 
 load_dotenv()
 
@@ -81,7 +81,7 @@ def handle_mention(event, say):
         say("Hi! Mention me with a question and I'll help.", thread_ts=thread_ts)
         return
 
-    logger.info("[Mention] User %s in #%s: %s", user_id, channel, clean[:100])
+    logger.info("[Mention] User %s in #%s: %s", user_id, channel, "[redacted]")
 
     metadata = {
         "slack_channel": channel,
@@ -124,7 +124,7 @@ def handle_dm(event, say):
     if not text:
         return
 
-    logger.info("[DM] User %s: %s", user_id, text[:100])
+    logger.info("[DM] User %s: %s", user_id, "[redacted]")
 
     metadata = {
         "slack_channel": event.get("channel", "dm"),
@@ -151,13 +151,13 @@ def handle_dm(event, say):
 # Clears the user's conversation memory for Slack
 # =============================================================================
 @app.command("/reset")
-def handle_reset(ack, command):
+def handle_reset(ack, command, respond):
     ack()
     user_id = command.get("user_id", "unknown")
-    clear_history(user_id=user_id, channel="slack")
+    reset_conversation({"user_id":user_id,"channel":"slack","metadata":{"slack_channel":command["channel_id"]}})
     logger.info("Memory cleared for Slack user %s", user_id)
     # Respond ephemerally (only the user sees it)
-    return {"response_type": "ephemeral", "text": "✅ Memory cleared. Let's start fresh!"}
+    respond({"response_type": "ephemeral", "text": "Memory and pending actions cleared for this conversation."})
 
 
 # =============================================================================

@@ -22,7 +22,10 @@ logging.basicConfig(
 logger = logging.getLogger("omniagent.scheduler")
 
 from workflows.daily_digest import run_daily_digest
-from workflows.news_tweet import run_news_tweet
+def run_news_tweet():
+    if os.environ.get("ENABLE_TWITTER_WORKFLOW", "").lower() == "true":
+        from workflows.news_tweet import run_news_tweet as run
+        return run()
 
 
 def main():
@@ -33,7 +36,7 @@ def main():
     # -------------------------------------------------------------------------
     scheduler.add_job(
         run_daily_digest,
-        CronTrigger(hour=9, minute=0),
+        CronTrigger(hour=9, minute=0, timezone="Asia/Karachi"),
         id="daily_digest",
         name="Daily AI News Digest",
         misfire_grace_time=3600,
@@ -46,7 +49,7 @@ def main():
     # -------------------------------------------------------------------------
     scheduler.add_job(
         run_news_tweet,
-        CronTrigger(hour="12,18", minute=0),
+        CronTrigger(hour="12,18", minute=0, timezone="Asia/Karachi"),
         id="news_tweet",
         name="AI News Tweet",
         misfire_grace_time=3600,

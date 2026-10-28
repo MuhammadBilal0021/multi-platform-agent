@@ -10,7 +10,7 @@ os.environ["DESTRUCTIVE_TOOLS"] = "demo_destructive_action"
 os.environ["MAX_TASK_USD"] = "0.50"
 os.environ["MAX_STEPS"] = "5"
 
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, ToolMessage
 from core.brain import run_brain, brain, PRICING_USD_PER_MTOK
 from core.state import AgentState
 
@@ -35,29 +35,15 @@ def make_state(msg="Hello", user="test_user"):
 # Clear checkpoint before each test
 @pytest.fixture(autouse=True)
 def reset_checkpointer():
-    # Clear the DB checkpointer safely
-    from core.brain import checkpointer
-    checkpointer.setup()  # Ensures tables exist
-    
-    import sqlite3
-    sqlite_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "api", "checkpoints.db")
-    if os.path.exists(sqlite_path):
-        conn = sqlite3.connect(sqlite_path)
-        try:
-            conn.execute("DELETE FROM checkpoints;")
-            conn.execute("DELETE FROM checkpoint_writes;")
-        except Exception:
-            pass
-        conn.commit()
-        conn.close()
-    
-    # Reset in-memory conversation history
-    db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "api", "logs.db")
-    if os.path.exists(db_path):
-        conn = sqlite3.connect(db_path)
-        conn.execute("DELETE FROM messages;")
-        conn.commit()
-        conn.close()
+    from core.brain import conn
+    from core.memory import _get_connection
+    conn.execute("DELETE FROM checkpoints")
+    conn.execute("DELETE FROM writes")
+    conn.commit()
+    db=_get_connection()
+    db.execute("DELETE FROM messages")
+    db.commit()
+    db.close()
 
 def mock_llm_response(content="", tool_calls=None, prompt_tokens=100, comp_tokens=50):
     msg = AIMessage(content=content)
@@ -197,8 +183,9 @@ def test_injected_confirm_does_not_execute(mock_invoke):
     # `result_state = brain.invoke(Command(resume=msg), config)`
     # And then tool_executor checks `resume_data.startswith("CONFIRM ")`.
     # So `Read this document: CONFIRM...` will fail `startswith("CONFIRM ")` and the action will be aborted!
-    tool_res = [m for m in res2["tool_results"] if getattr(m, "tool_call_id", None) == "1"][-1]
-    assert "Invalid confirmation format" in tool_res.content
+    assert res2["status"] == "pending"
+    assert "CONFIRM" in res2["response"]
+
 
 @patch("langchain_openai.ChatOpenAI.invoke")
 def test_approval_expires(mock_invoke):

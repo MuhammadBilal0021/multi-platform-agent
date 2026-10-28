@@ -1,28 +1,24 @@
 services:
   omniagent:
     build: .
-    container_name: omniagent
-    restart: unless-stopped
-    env_file:
-      - .env
+    env_file: .env
+    environment:
+      OMNI_DATA_DIR: /app/data
     ports:
-      - "8000:8000"   # FastAPI
+      - "127.0.0.1:8000:8000"
     volumes:
-      - ./data:/app/data  # Persist SQLite DB
-    healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
+      - omni-data:/app/data
+    restart: unless-stopped
   dashboard:
     build: .
-    container_name: omniagent-dashboard
-    restart: unless-stopped
-    env_file:
-      - .env
+    env_file: .env
+    environment:
+      OMNI_DATA_DIR: /app/data
     ports:
-      - "8501:8501"
-    command: ["streamlit", "run", "api/dashboard.py", "--server.port=8501", "--server.address=0.0.0.0"]
-    depends_on:
-      - omniagent
+      - "127.0.0.1:8501:8501"
+    volumes:
+      - omni-data:/app/data
+    command: ["streamlit", "run", "api/dashboard.py", "--server.address=0.0.0.0"]
+
+volumes:
+  omni-data:

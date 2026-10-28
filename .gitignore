@@ -23,3 +23,11 @@ Thumbs.db
 
 # Gemini
 .gemini/
+
+.venv/
+.pytest_cache/
+__pycache__/
+data/
+*.db
+*.db-*
+.env

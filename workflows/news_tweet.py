@@ -28,6 +28,9 @@ logger = logging.getLogger("omniagent.news_tweet")
 
 def run_news_tweet():
     """Search for AI news, generate a tweet, and post it."""
+    from core.security import is_user_allowed, is_tool_allowed
+    if not is_user_allowed("system") or not is_tool_allowed("web_search"):
+        return {"status":"skipped"}
     logger.info("Starting news tweet workflow...")
 
     # Step 1: Search for news
@@ -56,6 +59,9 @@ def run_news_tweet():
         "metadata": {"workflow": "news_tweet"},
     }
     result = run_brain(state)
+    if result.get("status") != "ok":
+        logger.warning("Tweet generation did not succeed; nothing published")
+        return {"status": "skipped"}
     tweet_text = result.get("response", "")
 
     if not tweet_text:
@@ -64,7 +70,14 @@ def run_news_tweet():
 
     # Step 3: Post the tweet
     logger.info("Generated tweet: %s", tweet_text[:100])
-    post_result = post_tweet(tweet_text)
+    if os.environ.get("ENABLE_PUBLISHING", "").lower() != "true":
+        return {"status":"draft", "text":tweet_text}
+    from core.delivery import deliver_once
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    now=datetime.now(ZoneInfo("Asia/Karachi"))
+    slot="12" if now.hour<18 else "18"
+    post_result = deliver_once(f"tweet:{now.date()}:{slot}", lambda:post_tweet(tweet_text))
     logger.info("Tweet result: %s", post_result)
 
     return post_result

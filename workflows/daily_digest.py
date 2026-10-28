@@ -35,6 +35,9 @@ GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS", "")
 # =============================================================================
 def gather_news() -> str:
     """Use Tavily web search to find the latest AI/tech news."""
+    from core.security import is_user_allowed, is_tool_allowed
+    if not is_user_allowed("system") or not is_tool_allowed("web_search"):
+        return ""
     logger.info("Gathering latest AI & tech news...")
     topics = [
         "latest AI news today",
@@ -79,7 +82,9 @@ def generate_digest(raw_news: str) -> str:
         "metadata": {"workflow": "daily_digest"},
     }
     result = run_brain(state)
-    digest = result.get("response", "Could not generate digest.")
+    if result.get("status") != "ok":
+        return ""
+    digest = result.get("response", "")
     logger.info("Generated digest: %d chars", len(digest))
     return digest
 
@@ -88,51 +93,28 @@ def generate_digest(raw_news: str) -> str:
 # STEP 3: DISTRIBUTE TO ALL PLATFORMS
 # =============================================================================
 def distribute_digest(digest: str):
-    """Send the digest to Discord, Slack, and Email."""
-    today = datetime.now().strftime("%B %d, %Y")
-    header = f"📰 **OmniAgent Daily Digest — {today}**\n\n"
-    full_digest = header + digest
-
-    # --- EMAIL ---
-    try:
+    if os.environ.get("ENABLE_PUBLISHING", "").lower() != "true":
+        return {"status":"draft","text":digest}
+    from core.delivery import deliver_once
+    from zoneinfo import ZoneInfo
+    import requests
+    day=datetime.now(ZoneInfo("Asia/Karachi")).date().isoformat()
+    text=f"OmniAgent Daily Digest — {day}\n\n{digest}"
+    results={}
+    if GMAIL_ADDRESS and os.environ.get("GMAIL_APP_PASSWORD"):
         from adapters.email_adapter import send_email
-        if GMAIL_ADDRESS:
-            result = send_email(
-                to=GMAIL_ADDRESS,
-                subject=f"🤖 OmniAgent Daily Digest — {today}",
-                body=full_digest,
-            )
-            logger.info("Email digest: %s", result["status"])
-    except Exception as e:
-        logger.error("Failed to send email digest: %s", e)
-
-    # --- DISCORD (via webhook) ---
-    try:
-        discord_webhook = os.environ.get("DISCORD_WEBHOOK_URL")
-        if discord_webhook:
-            import requests
-            # Discord webhooks have a 2000 char limit
-            truncated = full_digest[:1900]
-            requests.post(discord_webhook, json={"content": truncated}, timeout=10)
-            logger.info("Discord digest: sent via webhook")
-        else:
-            logger.info("Discord digest: skipped (no DISCORD_WEBHOOK_URL set)")
-    except Exception as e:
-        logger.error("Failed to send Discord digest: %s", e)
-
-    # --- SLACK (via webhook) ---
-    try:
-        slack_webhook = os.environ.get("SLACK_WEBHOOK_URL")
-        if slack_webhook:
-            import requests
-            requests.post(slack_webhook, json={"text": full_digest[:3000]}, timeout=10)
-            logger.info("Slack digest: sent via webhook")
-        else:
-            logger.info("Slack digest: skipped (no SLACK_WEBHOOK_URL set)")
-    except Exception as e:
-        logger.error("Failed to send Slack digest: %s", e)
-
-    logger.info("Digest distribution complete!")
+        results["email"]=deliver_once(f"digest:{day}:email",lambda:send_email(GMAIL_ADDRESS,f"OmniAgent Digest {day}",text))
+    def webhook(url,payload):
+        response=requests.post(url,json=payload,timeout=10)
+        response.raise_for_status()
+        return {"status":"ok"}
+    for platform,key,payload in [
+        ("discord","DISCORD_WEBHOOK_URL",{"content":text[:1900],"allowed_mentions":{"parse":[]}}),
+        ("slack","SLACK_WEBHOOK_URL",{"text":text[:3000]})]:
+        url=os.environ.get(key)
+        if url:
+            results[platform]=deliver_once(f"digest:{day}:{platform}",lambda:webhook(url,payload))
+    return results
 
 
 # =============================================================================
@@ -154,7 +136,8 @@ def run_daily_digest():
     digest = generate_digest(raw_news)
 
     # Step 3: Distribute
-    distribute_digest(digest)
+    if digest and os.environ.get("ENABLE_PUBLISHING", "").lower() == "true":
+        distribute_digest(digest)
 
     logger.info("=" * 60)
     logger.info("DAILY DIGEST COMPLETE")

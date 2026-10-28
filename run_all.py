@@ -30,7 +30,6 @@ shutdown_event = threading.Event()
 def run_discord():
     """Start the Discord adapter."""
     try:
-        from adapters.discord_adapter import client
         import asyncio
 
         token = os.environ.get("DISCORD_BOT_TOKEN")
@@ -38,6 +37,7 @@ def run_discord():
             logger.warning("DISCORD_BOT_TOKEN not set, skipping Discord adapter")
             return
 
+        from adapters.discord_adapter import client
         logger.info("Starting Discord adapter...")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -72,6 +72,9 @@ def run_slack():
 def run_email():
     """Start the Email adapter."""
     try:
+        if len(os.environ.get("EMAIL_COMMAND_SECRET", "")) < 32:
+            logger.info("Signed email commands not configured; skipping inbox polling")
+            return
         gmail = os.environ.get("GMAIL_ADDRESS")
         gmail_pw = os.environ.get("GMAIL_APP_PASSWORD")
         if not gmail or not gmail_pw:

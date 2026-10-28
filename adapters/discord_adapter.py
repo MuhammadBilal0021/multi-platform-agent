@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.brain import run_brain
 from core.state import AgentState
-from core.memory import clear_history
+from core.brain import reset_conversation
 
 load_dotenv()
 TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
@@ -140,7 +140,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 
 # CommandTree lets us register /reset and other slash commands
-client = discord.Client(intents=intents)
+client = discord.Client(intents=intents, allowed_mentions=discord.AllowedMentions.none())
 tree   = app_commands.CommandTree(client)
 
 
@@ -161,7 +161,7 @@ async def on_ready():
 @client.event
 async def on_message(message: discord.Message):
     # Ignore the bot's own messages
-    if message.author == client.user:
+    if message.author.bot:
         return
 
     is_dm      = isinstance(message.channel, discord.DMChannel)
@@ -187,7 +187,7 @@ async def on_message(message: discord.Message):
         )
         return
 
-    logger.info("[%s] %s: %s", "DM" if is_dm else "Server", message.author.name, clean[:100])
+    logger.info("[%s] %s: %s", "DM" if is_dm else "Server", message.author.name, "[redacted]")
 
     # Pass platform-specific extras into metadata
     metadata = {
@@ -280,10 +280,8 @@ async def help_command(interaction: discord.Interaction):
 # =============================================================================
 @tree.command(name="reset", description="Clear your conversation memory with the bot")
 async def reset_command(interaction: discord.Interaction):
-    clear_history(
-        user_id=str(interaction.user.id),
-        channel="discord",
-    )
+    reset_conversation({"user_id":str(interaction.user.id), "channel":"discord",
+        "metadata":{"guild_id":str(interaction.guild_id) if interaction.guild_id else "dm", "channel_id":str(interaction.channel_id)}})
     await interaction.response.send_message(
         "✅ Memory cleared. I've forgotten our previous conversation — let's start fresh!",
         ephemeral=True,   # only visible to the user who ran /reset

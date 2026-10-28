@@ -25,7 +25,7 @@ def is_tool_destructive(tool_name: str) -> bool:
     return tool_name in destructive
 
 def generate_nonce() -> str:
-    return secrets.token_hex(3)
+    return secrets.token_hex(16)
 
 def canonical_json(args: dict) -> str:
     if not isinstance(args, dict):
@@ -33,7 +33,7 @@ def canonical_json(args: dict) -> str:
     return json.dumps(args, sort_keys=True, separators=(",", ":"))
 
 def hash_tool_args(args: dict) -> str:
-    return hashlib.sha256(canonical_json(args).encode("utf-8")).hexdigest()[:12]
+    return hashlib.sha256(canonical_json(args).encode("utf-8")).hexdigest()
 
 def get_tool_signature(tool_name: str, args: dict) -> str:
     return f"{tool_name}:{hash_tool_args(args)}"

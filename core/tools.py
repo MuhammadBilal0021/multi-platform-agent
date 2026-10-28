@@ -17,7 +17,8 @@ load_dotenv()
 logger = logging.getLogger("omniagent.tools")
 
 # Tavily client for web search
-tavily_client = TavilyClient(api_key=os.environ.get("TAVILY_API_KEY"))
+def search_client():
+    return TavilyClient(api_key=os.environ.get("TAVILY_API_KEY"))
 
 
 # -----------------------------------------------------------------------------
@@ -30,7 +31,7 @@ def web_search(query: str) -> str:
     Always use this tool if you are asked about recent events or things you don't know.
     """
     try:
-        response = tavily_client.search(query=query, search_depth="basic")
+        response = search_client().search(query=query, search_depth="basic")
         results = response.get("results", [])
         if not results:
             return "No internet results found for that query."
@@ -76,50 +77,13 @@ def summarize_url(url: str) -> str:
     Fetch the text content of a webpage and return a summary.
     Use this when someone shares a link and asks you to read or summarize it.
     """
+    from core.fetch import fetch_html, page_text
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; OmniAgent/1.0)"
-        }
-        resp = requests.get(url, headers=headers, timeout=10)
-        resp.raise_for_status()
-
-        # Extract text — strip HTML tags with a simple approach
-        from html.parser import HTMLParser
-
-        class TextExtractor(HTMLParser):
-            def __init__(self):
-                super().__init__()
-                self.text_parts = []
-                self._skip = False
-
-            def handle_starttag(self, tag, attrs):
-                if tag in ("script", "style", "nav", "footer", "header"):
-                    self._skip = True
-
-            def handle_endtag(self, tag):
-                if tag in ("script", "style", "nav", "footer", "header"):
-                    self._skip = False
-
-            def handle_data(self, data):
-                if not self._skip:
-                    cleaned = data.strip()
-                    if cleaned:
-                        self.text_parts.append(cleaned)
-
-        extractor = TextExtractor()
-        extractor.feed(resp.text)
-        full_text = " ".join(extractor.text_parts)
-
-        # Truncate to ~3000 chars so it fits in the LLM context
-        if len(full_text) > 3000:
-            full_text = full_text[:3000] + "... [truncated]"
-
-        logger.info(f"summarize_url: fetched {len(full_text)} chars from {url}")
-        return f"Content from {url}:\n\n{full_text}"
-
-    except Exception as e:
-        logger.error(f"summarize_url failed for '{url}': {e}")
-        return f"Error fetching URL: {str(e)}"
+        html, final_url = fetch_html(url)
+        return f"Untrusted webpage content from {final_url}:\n" + page_text(html)[:3000]
+    except Exception:
+        logger.warning("URL retrieval rejected or failed")
+        return "URL retrieval rejected or unavailable."
 
 
 # -----------------------------------------------------------------------------

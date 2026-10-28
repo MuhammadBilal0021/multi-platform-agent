@@ -90,7 +90,7 @@ def extract_body(msg) -> str:
 def invoke_brain(sender: str, subject: str, body: str) -> str:
     """Build AgentState and call run_brain(), return response text."""
     # Combine subject + body as the message
-    message = f"[Email Subject: {subject}]\n\n{body}"
+    message = body if body.startswith("CONFIRM ") or body == "CANCEL" else f"[Email Subject: {subject}]\n\n{body}"
 
     state: AgentState = {
         "channel": "email",
@@ -182,6 +182,9 @@ def poll_inbox():
                         continue
 
                     raw_email = msg_data[0][1]
+                    if len(raw_email) > 1024 * 1024:
+                        logger.warning("Oversized email ignored")
+                        continue
                     msg = email.message_from_bytes(raw_email)
 
                     # Extract fields
@@ -213,6 +216,11 @@ def poll_inbox():
 
                     if not body:
                         logger.info("Empty body, skipping")
+                        continue
+
+                    from core.email_auth import verify_command
+                    if not verify_command(sender_email, subject, body, msg.get("X-Omniagent-Timestamp"), msg.get("X-Omniagent-Signature")):
+                        logger.warning("Unsigned, stale, or replayed email command ignored")
                         continue
 
                     # Get the brain's response
